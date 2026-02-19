@@ -1,37 +1,36 @@
-export interface Account {
+// MuleRift Data Contract - TypeScript Interfaces
+
+export interface SuspiciousAccount {
   account_id: string;
-  fraud_score: number;
+  suspicion_score: number;
+  detected_patterns: string[];
   ring_id: string | null;
-  patterns: string[];
 }
 
 export interface FraudRing {
   ring_id: string;
-  pattern: string;
-  members: string[];
-  avg_score: number;
+  member_accounts: string[];
+  pattern_type: string;
+  risk_score: number;
 }
 
 export interface AnalysisResult {
+  suspicious_accounts: SuspiciousAccount[];
+  fraud_rings: FraudRing[];
   summary: {
-    total_accounts: number;
-    flagged_accounts: number;
-    rings_detected: number;
-    processing_time_ms: number;
-  };
-  accounts: Account[];
-  rings: FraudRing[];
-  graph: {
-    nodes: GraphNode[];
-    edges: GraphEdge[];
+    total_accounts_analyzed: number;
+    suspicious_accounts_flagged: number;
+    fraud_rings_detected: number;
+    processing_time_seconds: number;
   };
 }
 
+// Graph visualization types
 export interface GraphNode {
   id: string;
   type: 'account' | 'shared_entity';
   label: string;
-  fraud_score?: number;
+  suspicion_score?: number;
   ring_id?: string | null;
 }
 

@@ -60,15 +60,11 @@ export default function ResultsPage() {
         </div>
 
         <SummaryStats summary={result.summary} />
-        <GraphVisualization
-          graph={result.graph}
-          onNodeClick={(nodeId) => setSelectedAccount(nodeId)}
-        />
-        <FraudRingTable rings={result.rings} />
+        <FraudRingTable rings={result.fraud_rings} />
 
         {selectedAccount && (
           <AccountModal
-            account={result.accounts.find((a) => a.account_id === selectedAccount)!}
+            account={result.suspicious_accounts.find((a) => a.account_id === selectedAccount)!}
             onClose={() => setSelectedAccount(null)}
           />
         )}

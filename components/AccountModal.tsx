@@ -1,9 +1,9 @@
 "use client";
 
-import { Account } from "@/lib/types";
+import { SuspiciousAccount } from "@/lib/types";
 
 interface AccountModalProps {
-  account: Account;
+  account: SuspiciousAccount;
   onClose: () => void;
 }
 
@@ -23,9 +23,9 @@ export default function AccountModal({ account, onClose }: AccountModalProps) {
             <p className="font-mono font-semibold">{account.account_id}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Fraud Score</p>
-            <p className={`text-2xl font-bold ${account.fraud_score > 50 ? "text-red-600" : "text-green-600"}`}>
-              {account.fraud_score}
+            <p className="text-sm text-gray-600">Suspicion Score</p>
+            <p className={`text-2xl font-bold ${account.suspicion_score > 50 ? "text-red-600" : "text-green-600"}`}>
+              {account.suspicion_score}
             </p>
           </div>
           <div>
@@ -35,7 +35,7 @@ export default function AccountModal({ account, onClose }: AccountModalProps) {
           <div>
             <p className="text-sm text-gray-600">Patterns Detected</p>
             <ul className="list-disc list-inside">
-              {account.patterns.map((pattern, idx) => (
+              {account.detected_patterns.map((pattern, idx) => (
                 <li key={idx} className="text-sm">{pattern}</li>
               ))}
             </ul>
