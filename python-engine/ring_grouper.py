@@ -84,23 +84,50 @@ def _combine_structural_groups(analysis_results):
     cycle_groups = analysis_results.get('cycle_groups', [])
     merged_cycles, account_cycle_count = _merge_overlapping_cycles(cycle_groups)
     
+    # Sort members alphabetically within each merged cycle
     for group in merged_cycles:
-        candidate_groups.append(group)
+        candidate_groups.append(sorted(group))
         pattern_types.append('cycle')
     
-    # Add smurfing groups
+    # Add smurfing groups with sorted members
     smurfing_groups = analysis_results.get('smurfing_groups', [])
     for group in smurfing_groups:
         candidate_groups.append(sorted(list(set(group))))
         pattern_types.append('smurfing')
     
-    # Add shell groups
+    # Add shell groups with sorted members
     shell_groups = analysis_results.get('shell_groups', [])
     for group in shell_groups:
         candidate_groups.append(sorted(list(set(group))))
         pattern_types.append('shell')
     
     return candidate_groups, pattern_types, account_cycle_count
+
+
+def _sort_rings_deterministically(candidate_groups, pattern_types):
+    """
+    Sort rings deterministically by first account_id in each ring.
+    
+    This ensures deterministic ring ID assignment across multiple runs.
+    
+    Args:
+        candidate_groups: list of lists (account groups with sorted members)
+        pattern_types: list of pattern type strings
+        
+    Returns:
+        tuple: (sorted_groups, sorted_pattern_types)
+    """
+    # Combine groups with their pattern types for sorting
+    combined = list(zip(candidate_groups, pattern_types))
+    
+    # Sort by the first account_id in each group
+    combined.sort(key=lambda x: x[0][0] if x[0] else '')
+    
+    # Unzip back into separate lists
+    sorted_groups = [group for group, _ in combined]
+    sorted_pattern_types = [pattern for _, pattern in combined]
+    
+    return sorted_groups, sorted_pattern_types
 
 
 def _calculate_ring_risk_score(member_accounts, scores_dict, account_cycle_count):
@@ -141,18 +168,19 @@ def _calculate_ring_risk_score(member_accounts, scores_dict, account_cycle_count
 
 def group_rings(graph, scores_dict, analysis_results):
     """
-    Group accounts into fraud rings with overlapping cycle merging.
+    Group accounts into fraud rings with deterministic ring ID assignment.
     
-    This function implements advanced structural ring intelligence:
-    - Overlapping cycles are merged into single rings
-    - Accounts in multiple cycles receive elevated risk scores (+25 per overlap)
-    - Ring IDs are assigned based on detection sequence
+    This function implements advanced structural ring intelligence with
+    deterministic ordering to ensure consistent ring IDs across multiple runs:
     
     Process:
-    1. Merge overlapping cycles using graph-based clustering
-    2. Combine with smurfing and shell groups
-    3. Assign sequential ring IDs based on detection order
-    4. Calculate risk scores with multi-cycle bonuses
+    1. Consolidate: Merge overlapping cycles that share common members
+    2. Member Sort: Sort account IDs alphabetically within each ring
+    3. Global Sort: Sort rings by first account_id in each ring
+    4. Sequential ID: Assign RING_001, RING_002, etc. based on sorted order
+    
+    This ensures that running the same CSV twice produces identical ring IDs.
+    For example, if ACC_001 is in a ring, it will always be in RING_001.
     
     Args:
         graph: networkx.DiGraph (kept for compatibility)
@@ -169,15 +197,21 @@ def group_rings(graph, scores_dict, analysis_results):
             - pattern_type: str ("cycle", "smurfing", or "shell")
             - risk_score: float (0-100, rounded to 1 decimal)
     """
-    # Combine and merge structural groups
+    # Step 1: Consolidate and merge structural groups
     candidate_groups, pattern_types, account_cycle_count = _combine_structural_groups(analysis_results)
     
     if not candidate_groups:
         return []
     
-    # Build fraud rings with sequential IDs based on detection order
+    # Step 2: Member Sort - already done in _combine_structural_groups
+    # Each group now has alphabetically sorted members
+    
+    # Step 3: Global Sort - sort rings by first account_id
+    sorted_groups, sorted_pattern_types = _sort_rings_deterministically(candidate_groups, pattern_types)
+    
+    # Step 4: Sequential ID - assign RING_001, RING_002, etc.
     fraud_rings = []
-    for idx, (member_accounts, pattern_type) in enumerate(zip(candidate_groups, pattern_types), start=1):
+    for idx, (member_accounts, pattern_type) in enumerate(zip(sorted_groups, sorted_pattern_types), start=1):
         ring_id = f"RING_{idx:03d}"
         risk_score = _calculate_ring_risk_score(member_accounts, scores_dict, account_cycle_count)
         
