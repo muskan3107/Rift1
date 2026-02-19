@@ -2,9 +2,13 @@ node_modules
 .next
 .env
 .env.local
+.env*.local
 __pycache__
 *.pyc
 .DS_Store
 out
 dist
 build
+*.json
+!package.json
+!tsconfig.json

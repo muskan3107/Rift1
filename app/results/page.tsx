@@ -4,14 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnalysisResult } from "@/lib/types";
 import SummaryStats from "@/components/SummaryStats";
-import GraphVisualization from "@/components/GraphVisualization";
 import FraudRingTable from "@/components/FraudRingTable";
 import AccountModal from "@/components/AccountModal";
+import ChatInterface from "@/components/ChatInterface";
 
 export default function ResultsPage() {
   const router = useRouter();
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [showChat, setShowChat] = useState(false);
 
   useEffect(() => {
     const data = sessionStorage.getItem("analysisResult");
@@ -45,6 +46,12 @@ export default function ResultsPage() {
           <h1 className="text-3xl font-bold text-gray-800">Analysis Results</h1>
           <div className="space-x-4">
             <button
+              onClick={() => setShowChat(!showChat)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              {showChat ? "Hide" : "Show"} AI Assistant
+            </button>
+            <button
               onClick={handleDownload}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
             >
@@ -59,8 +66,20 @@ export default function ResultsPage() {
           </div>
         </div>
 
-        <SummaryStats summary={result.summary} />
-        <FraudRingTable rings={result.fraud_rings} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className={showChat ? "lg:col-span-2" : "lg:col-span-3"}>
+            <SummaryStats summary={result.summary} />
+            <FraudRingTable rings={result.fraud_rings} />
+          </div>
+
+          {showChat && (
+            <div className="lg:col-span-1">
+              <div className="sticky top-8 h-[calc(100vh-8rem)]">
+                <ChatInterface analysisContext={result} />
+              </div>
+            </div>
+          )}
+        </div>
 
         {selectedAccount && (
           <AccountModal
