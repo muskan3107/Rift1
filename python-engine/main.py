@@ -9,17 +9,21 @@ def calculate_suspicion_score(patterns):
     score = 0
     pattern_weights = {
         'cycle': 40,
-        'velocity': 30,
-        'peel': 30
+        'smurfing': 30,
+        'shell': 30,
+        'velocity': 30
     }
     
     for pattern in patterns:
-        if 'cycle' in pattern.lower():
+        pattern_lower = pattern.lower()
+        if 'cycle' in pattern_lower:
             score += pattern_weights['cycle']
-        elif 'velocity' in pattern.lower():
+        elif 'fan_in' in pattern_lower or 'fan_out' in pattern_lower:
+            score += pattern_weights['smurfing']
+        elif 'shell' in pattern_lower:
+            score += pattern_weights['shell']
+        elif 'velocity' in pattern_lower:
             score += pattern_weights['velocity']
-        elif 'peel' in pattern.lower():
-            score += pattern_weights['peel']
     
     return min(score, 100)
 
@@ -27,9 +31,9 @@ def main():
     """MuleRift - Graph-based money muling detection engine.
     
     Analyzes transaction CSV to detect:
-    - Cycles in transaction flow (A → B → C → A)
-    - Temporal velocity (rapid pass-through within 72 hours)
-    - Suspicion scores combining structural and temporal signals
+    - Circular Fund Routing (Cycles)
+    - Smurfing Patterns (Fan-in / Fan-out)
+    - Layered Shell Networks
     """
     if len(sys.argv) < 2:
         print(json.dumps({"error": "Usage: python main.py <csv_path>"}), file=sys.stderr)
@@ -51,8 +55,9 @@ def main():
     suspicious_accounts = []
     all_suspicious_nodes = (
         results['cycle_nodes'] | 
-        results['velocity_nodes'] | 
-        results['peel_nodes']
+        results['smurfing_nodes'] | 
+        results['shell_nodes'] |
+        results['velocity_nodes']
     )
     
     # Map accounts to rings
@@ -65,9 +70,16 @@ def main():
             account_to_ring[account] = ring_id
         ring_counter += 1
     
-    for peel_chain in results['peel_groups']:
+    for smurfing_group in results['smurfing_groups']:
         ring_id = f"RING_{ring_counter:03d}"
-        for account in peel_chain:
+        for account in smurfing_group:
+            if account not in account_to_ring:
+                account_to_ring[account] = ring_id
+        ring_counter += 1
+    
+    for shell_chain in results['shell_groups']:
+        ring_id = f"RING_{ring_counter:03d}"
+        for account in shell_chain:
             if account not in account_to_ring:
                 account_to_ring[account] = ring_id
         ring_counter += 1
@@ -75,66 +87,120 @@ def main():
     for account_id in all_suspicious_nodes:
         detected_patterns = []
         
+        # Add descriptive pattern names
         if account_id in results['cycle_nodes']:
-            detected_patterns.append('cycle')
+            pattern_name = results['cycle_metadata'].get(account_id, 'cycle')
+            detected_patterns.append(pattern_name)
+        
+        if account_id in results['smurfing_nodes']:
+            pattern_name = results['smurfing_metadata'].get(account_id, 'smurfing')
+            detected_patterns.append(pattern_name)
+        
+        if account_id in results['shell_nodes']:
+            pattern_name = results['shell_metadata'].get(account_id, 'shell')
+            detected_patterns.append(pattern_name)
+        
         if account_id in results['velocity_nodes']:
-            detected_patterns.append('velocity')
-        if account_id in results['peel_nodes']:
-            detected_patterns.append('peel')
+            pattern_name = results['velocity_metadata'].get(account_id, 'high_velocity')
+            detected_patterns.append(pattern_name)
         
         suspicion_score = calculate_suspicion_score(detected_patterns)
         
-        suspicious_accounts.append({
-            "account_id": account_id,
-            "suspicion_score": suspicion_score,
-            "detected_patterns": detected_patterns,
-            "ring_id": account_to_ring.get(account_id, None)
-        })
+        # Only include accounts with score > 50
+        if suspicion_score > 50:
+            suspicious_accounts.append({
+                "account_id": account_id,
+                "suspicion_score": round(suspicion_score, 1),
+                "detected_patterns": detected_patterns,
+                "ring_id": account_to_ring.get(account_id, "")
+            })
+    
+    # Sort by suspicion_score descending
+    suspicious_accounts.sort(key=lambda x: x['suspicion_score'], reverse=True)
     
     # Build fraud_rings list
     fraud_rings = []
-    ring_members = {}
+    ring_data = {}
     
+    # Process cycle groups
     for cycle in results['cycle_groups']:
         ring_id = f"RING_{len(fraud_rings) + 1:03d}"
-        ring_members[ring_id] = {
-            'members': list(cycle),
+        ring_data[ring_id] = {
+            'members': sorted(list(set(cycle))),
             'pattern_type': 'cycle'
         }
+        fraud_rings.append(ring_id)
     
-    for peel_chain in results['peel_groups']:
-        ring_id = f"RING_{len(fraud_rings) + len(ring_members) + 1:03d}"
-        ring_members[ring_id] = {
-            'members': list(peel_chain),
-            'pattern_type': 'peel'
+    # Process smurfing groups
+    for smurfing_group in results['smurfing_groups']:
+        ring_id = f"RING_{len(fraud_rings) + 1:03d}"
+        ring_data[ring_id] = {
+            'members': sorted(list(set(smurfing_group))),
+            'pattern_type': 'smurfing'
         }
+        fraud_rings.append(ring_id)
     
-    for ring_id, data in ring_members.items():
-        member_scores = [
-            acc['suspicion_score'] 
-            for acc in suspicious_accounts 
-            if acc['account_id'] in data['members']
-        ]
+    # Process shell groups
+    for shell_chain in results['shell_groups']:
+        ring_id = f"RING_{len(fraud_rings) + 1:03d}"
+        ring_data[ring_id] = {
+            'members': sorted(list(set(shell_chain))),
+            'pattern_type': 'shell'
+        }
+        fraud_rings.append(ring_id)
+    
+    # Build final fraud_rings output
+    fraud_rings_output = []
+    for ring_id in fraud_rings:
+        data = ring_data[ring_id]
+        
+        # Calculate risk score from all members (not just suspicious ones)
+        member_scores = []
+        for account_id in data['members']:
+            detected_patterns = []
+            
+            if account_id in results['cycle_nodes']:
+                pattern_name = results['cycle_metadata'].get(account_id, 'cycle')
+                detected_patterns.append(pattern_name)
+            
+            if account_id in results['smurfing_nodes']:
+                pattern_name = results['smurfing_metadata'].get(account_id, 'smurfing')
+                detected_patterns.append(pattern_name)
+            
+            if account_id in results['shell_nodes']:
+                pattern_name = results['shell_metadata'].get(account_id, 'shell')
+                detected_patterns.append(pattern_name)
+            
+            if account_id in results['velocity_nodes']:
+                pattern_name = results['velocity_metadata'].get(account_id, 'high_velocity')
+                detected_patterns.append(pattern_name)
+            
+            score = calculate_suspicion_score(detected_patterns)
+            member_scores.append(score)
+        
         risk_score = sum(member_scores) / len(member_scores) if member_scores else 0
         
-        fraud_rings.append({
+        fraud_rings_output.append({
             "ring_id": ring_id,
             "member_accounts": data['members'],
             "pattern_type": data['pattern_type'],
-            "risk_score": round(risk_score, 2)
+            "risk_score": round(risk_score, 1)
         })
+    
+    # Sort by ring_id ascending
+    fraud_rings_output.sort(key=lambda x: x['ring_id'])
     
     processing_time = time.time() - start_time
     
     # Build final output matching MuleRift contract
     output = {
         "suspicious_accounts": suspicious_accounts,
-        "fraud_rings": fraud_rings,
+        "fraud_rings": fraud_rings_output,
         "summary": {
             "total_accounts_analyzed": G.number_of_nodes(),
             "suspicious_accounts_flagged": len(suspicious_accounts),
-            "fraud_rings_detected": len(fraud_rings),
-            "processing_time_seconds": round(processing_time, 3)
+            "fraud_rings_detected": len(fraud_rings_output),
+            "processing_time_seconds": round(processing_time, 1)
         }
     }
     
