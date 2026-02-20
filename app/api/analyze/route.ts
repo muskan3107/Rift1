@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
-import path from "path";
-import { analyzeCsv } from "@/lib/pythonBridge";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,26 +9,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    const tmpPath = path.join(process.cwd(), "tmp", `upload-${Date.now()}.csv`);
-    await writeFile(tmpPath, buffer);
-
-    const result = await analyzeCsv(tmpPath);
-
-    // Serialize with custom float formatting
-    let jsonString = JSON.stringify(result);
+    // Get backend URL from environment variable
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     
-    // Replace numeric values with .1 decimal format for specific fields
-    jsonString = jsonString.replace(/"(suspicion_score|risk_score|processing_time_seconds)":(\d+\.?\d*)([,\}])/g, (match, field, value, suffix) => {
-      const num = parseFloat(value);
-      return `"${field}":${num.toFixed(1)}${suffix}`;
+    if (!backendUrl) {
+      return NextResponse.json(
+        { error: "Backend URL not configured" },
+        { status: 500 }
+      );
+    }
+
+    // Forward file to Python backend
+    const backendFormData = new FormData();
+    backendFormData.append("file", file);
+
+    const response = await fetch(`${backendUrl}/analyze`, {
+      method: "POST",
+      body: backendFormData,
     });
 
-    return new NextResponse(jsonString, {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Backend analysis failed: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Analysis error:", error);
     return NextResponse.json(
