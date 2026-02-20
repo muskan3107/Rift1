@@ -2,8 +2,8 @@
 set -e
 
 echo "🐍 Installing Python dependencies..."
-python3 -m pip install --upgrade pip
-pip3 install -r python-engine/requirements.txt
+python3 -m pip install --upgrade pip --user
+python3 -m pip install -r python-engine/requirements.txt --user
 
 echo "📦 Installing Node dependencies..."
 npm ci

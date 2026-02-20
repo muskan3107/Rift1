@@ -5,9 +5,9 @@ services:
     region: oregon
     plan: free
     buildCommand: |
-      # Install Python and dependencies
-      python3 -m pip install --upgrade pip
-      pip3 install -r python-engine/requirements.txt
+      # Install Python dependencies with --user flag to persist them
+      python3 -m pip install --upgrade pip --user
+      python3 -m pip install -r python-engine/requirements.txt --user
       # Install Node dependencies and build Next.js
       npm ci
       npm run build
@@ -17,4 +17,8 @@ services:
         value: 20
       - key: GROQ_API_KEY
         sync: false
+      - key: PYTHONPATH
+        value: /opt/render/project/src/python-engine
+      - key: PYTHONUSERBASE
+        value: /opt/render/project/.local
     healthCheckPath: /api/health
