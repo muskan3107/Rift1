@@ -1,42 +1,50 @@
 import { NextResponse } from "next/server";
-import path from "path";
-import { analyzeCsv } from "@/lib/pythonBridge";
 
 export async function POST() {
-  console.log("=== /api/sample POST called ===");
   try {
-    const samplePath = path.join(process.cwd(), "public", "sample_data.csv");
-    console.log("Sample CSV path:", samplePath);
+    // Get backend URL from environment variable
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     
-    console.log("Calling Python detection engine...");
-    const result = await analyzeCsv(samplePath);
-    console.log("Python analysis completed successfully");
-    console.log("Result summary:", result?.summary);
+    if (!backendUrl) {
+      return NextResponse.json(
+        { error: "Backend URL not configured" },
+        { status: 500 }
+      );
+    }
 
-    // Serialize with custom float formatting
-    let jsonString = JSON.stringify(result);
+    // Fetch sample CSV from public folder
+    const sampleUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/sample_data.csv`;
+    const csvResponse = await fetch(sampleUrl);
     
-    // Replace numeric values with .1 decimal format for specific fields
-    jsonString = jsonString.replace(/"(suspicion_score|risk_score|processing_time_seconds)":(\d+\.?\d*)([,\}])/g, (match, field, value, suffix) => {
-      const num = parseFloat(value);
-      return `"${field}":${num.toFixed(1)}${suffix}`;
+    if (!csvResponse.ok) {
+      throw new Error("Failed to fetch sample CSV");
+    }
+
+    const csvBlob = await csvResponse.blob();
+    const csvFile = new File([csvBlob], "sample_data.csv", { type: "text/csv" });
+
+    // Forward to Python backend
+    const formData = new FormData();
+    formData.append("file", csvFile);
+
+    const response = await fetch(`${backendUrl}/analyze`, {
+      method: "POST",
+      body: formData,
     });
 
-    console.log("Returning formatted JSON response");
-    return new NextResponse(jsonString, {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Backend analysis failed: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    return NextResponse.json(result);
   } catch (error) {
-    console.error("=== SAMPLE ANALYSIS ERROR ===");
-    console.error("Error type:", error?.constructor?.name);
-    console.error("Error message:", error instanceof Error ? error.message : String(error));
-    console.error("Full error:", error);
-    console.error("Stack trace:", error instanceof Error ? error.stack : "No stack trace");
-    
+    console.error("Sample analysis error:", error);
     return NextResponse.json(
       { 
-        error: error instanceof Error ? error.message : "Sample analysis failed",
-        details: error instanceof Error ? error.stack : String(error)
+        error: error instanceof Error ? error.message : "Sample analysis failed"
       },
       { status: 500 }
     );
@@ -44,39 +52,50 @@ export async function POST() {
 }
 
 export async function GET() {
-  console.log("=== /api/sample GET called ===");
   try {
-    const samplePath = path.join(process.cwd(), "public", "sample_data.csv");
-    console.log("Sample CSV path:", samplePath);
+    // Get backend URL from environment variable
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     
-    console.log("Calling Python detection engine...");
-    const result = await analyzeCsv(samplePath);
-    console.log("Python analysis completed successfully");
+    if (!backendUrl) {
+      return NextResponse.json(
+        { error: "Backend URL not configured" },
+        { status: 500 }
+      );
+    }
 
-    // Serialize with custom float formatting
-    let jsonString = JSON.stringify(result);
+    // Fetch sample CSV from public folder
+    const sampleUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/sample_data.csv`;
+    const csvResponse = await fetch(sampleUrl);
     
-    // Replace numeric values with .1 decimal format for specific fields
-    jsonString = jsonString.replace(/"(suspicion_score|risk_score|processing_time_seconds)":(\d+\.?\d*)([,\}])/g, (match, field, value, suffix) => {
-      const num = parseFloat(value);
-      return `"${field}":${num.toFixed(1)}${suffix}`;
+    if (!csvResponse.ok) {
+      throw new Error("Failed to fetch sample CSV");
+    }
+
+    const csvBlob = await csvResponse.blob();
+    const csvFile = new File([csvBlob], "sample_data.csv", { type: "text/csv" });
+
+    // Forward to Python backend
+    const formData = new FormData();
+    formData.append("file", csvFile);
+
+    const response = await fetch(`${backendUrl}/analyze`, {
+      method: "POST",
+      body: formData,
     });
 
-    console.log("Returning formatted JSON response");
-    return new NextResponse(jsonString, {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Backend analysis failed: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    return NextResponse.json(result);
   } catch (error) {
-    console.error("=== SAMPLE ANALYSIS ERROR (GET) ===");
-    console.error("Error type:", error?.constructor?.name);
-    console.error("Error message:", error instanceof Error ? error.message : String(error));
-    console.error("Full error:", error);
-    console.error("Stack trace:", error instanceof Error ? error.stack : "No stack trace");
-    
+    console.error("Sample analysis error:", error);
     return NextResponse.json(
       { 
-        error: error instanceof Error ? error.message : "Sample analysis failed",
-        details: error instanceof Error ? error.stack : String(error)
+        error: error instanceof Error ? error.message : "Sample analysis failed"
       },
       { status: 500 }
     );
