@@ -5,9 +5,9 @@ services:
     region: oregon
     plan: free
     buildCommand: |
-      # Install Python dependencies with --user flag to persist them
-      python3 -m pip install --upgrade pip --user
-      python3 -m pip install -r python-engine/requirements.txt --user
+      # Install Python dependencies globally
+      python3 -m pip install --upgrade pip
+      python3 -m pip install -r python-engine/requirements.txt
       # Install Node dependencies and build Next.js
       npm ci
       npm run build
@@ -19,6 +19,6 @@ services:
         sync: false
       - key: PYTHONPATH
         value: /opt/render/project/src/python-engine
-      - key: PYTHONUSERBASE
-        value: /opt/render/project/.local
+      - key: PATH
+        value: /opt/render/.local/bin:/usr/local/bin:/usr/bin:/bin
     healthCheckPath: /api/health
