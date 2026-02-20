@@ -5,7 +5,9 @@ import { AnalysisResult } from './types';
 export async function analyzeCsv(csvPath: string): Promise<AnalysisResult> {
   return new Promise((resolve, reject) => {
     const pythonScript = path.join(process.cwd(), 'python-engine', 'main.py');
-    const pythonProcess = spawn('python', [pythonScript, csvPath]);
+    // Use python3 for production environments (Render, etc.)
+    const pythonCommand = process.env.NODE_ENV === 'production' ? 'python3' : 'python';
+    const pythonProcess = spawn(pythonCommand, [pythonScript, csvPath]);
 
     let stdout = '';
     let stderr = '';

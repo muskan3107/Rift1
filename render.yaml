@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: mulerift-app
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: |
+      # Install Python and dependencies
+      python3 -m pip install --upgrade pip
+      pip3 install -r python-engine/requirements.txt
+      # Install Node dependencies and build Next.js
+      npm ci
+      npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: GROQ_API_KEY
+        sync: false
+    healthCheckPath: /api/health
